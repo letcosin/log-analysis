@@ -24,19 +24,24 @@ Full-stack project for importing, processing, and analyzing application logs.
 - Frontend: http://localhost:5173
 - PostgreSQL: localhost:5432
 
-## Quick start with Docker
+## Install dependencies and run with Docker Compose
 
-From the project root:
+Install the dependencies for both apps:
 
-```bash
-docker compose up --build
+```powershell
+cd api
+npm install
+
+cd ../web
+npm install
 ```
 
-Then open:
+From the project root, start the application with Docker Compose:
 
-- Frontend: http://localhost:5173
-- API: http://localhost:3001
-- Swagger: http://localhost:3001/api-docs
+```powershell
+cd ..
+docker-compose up --build
+```
 
 ## Local development
 
