@@ -6,17 +6,19 @@ export type ImportResult = {
   total: number;
   imported: number;
   ignored: number;
+  durationMs: number;
 };
 
 export class LogImportService {
   async importFromText(content: string): Promise<ImportResult> {
+    const startedAt = Date.now();
     const lines = content.split(/\r?\n/);
     const validLogs: Partial<Log>[] = [];
 
     let imported = 0;
     let ignored = 0;
 
-    for (const [index, line] of lines.entries()) {
+    for (const line of lines) {
       const trimmed = line.trim();
 
       if (!trimmed) {
@@ -26,7 +28,8 @@ export class LogImportService {
       const parsed = parseLogLine(line);
 
       if (!parsed) {
-        throw new Error(`Formato de log inválido na linha ${index + 1}: "${line}"`);
+        ignored += 1;
+        continue;
       }
 
       validLogs.push({
@@ -48,6 +51,7 @@ export class LogImportService {
       total: imported + ignored,
       imported,
       ignored,
+      durationMs: Date.now() - startedAt,
     };
   }
 }

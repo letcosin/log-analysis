@@ -42,6 +42,16 @@ router.post('/import', upload.single('file'), controller.import);
  *         schema:
  *           type: string
  *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
  *         name: page
  *         schema:
  *           type: integer

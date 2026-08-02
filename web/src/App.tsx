@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { BarChart, Bar, CartesianGrid, LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'
 
@@ -32,6 +32,11 @@ type StatsResponse = {
   total: number
   byLevel: StatItem[]
   timeline: TimelineItem[]
+}
+
+type TrendItem = {
+  period: string
+  count: number
 }
 
 const levels: LogLevel[] = ['INFO', 'WARN', 'ERROR', 'DEBUG']
@@ -80,8 +85,11 @@ function App() {
   const [logs, setLogs] = useState<ApiLog[]>([])
   const [totalLogs, setTotalLogs] = useState(0)
   const [chartData, setChartData] = useState<{ period: string; total: number }[]>([])
+  const [trendData, setTrendData] = useState<TrendItem[]>([])
   const [totalByLevel, setTotalByLevel] = useState<{ name: string; value: number }[]>([])
   const [loading, setLoading] = useState(true)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
@@ -98,14 +106,23 @@ function App() {
       params.set('search', search.trim())
     }
 
+    if (startDate) {
+      params.set('startDate', startDate)
+    }
+
+    if (endDate) {
+      params.set('endDate', endDate)
+    }
+
     setLoading(true)
     setError(null)
     setSuccessMessage(null)
 
     try {
-      const [logsResponse, statsResponse] = await Promise.all([
+      const [logsResponse, statsResponse, trendsResponse] = await Promise.all([
         fetchJson<LogsResponse>(`${API_URL}/logs?${params.toString()}`),
         fetchJson<StatsResponse>(`${API_URL}/logs/stats`),
+        fetchJson<TrendItem[]>(`${API_URL}/dashboard/trends`),
       ])
 
       setLogs(logsResponse.data ?? [])
@@ -127,6 +144,7 @@ function App() {
       }))
 
       setChartData(nextChartData)
+      setTrendData(trendsResponse ?? [])
       setTotalByLevel(nextTotalByLevel)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Erro ao carregar os dados da API.')
@@ -137,7 +155,7 @@ function App() {
 
   useEffect(() => {
     void loadData()
-  }, [search, selectedLevel])
+  }, [search, selectedLevel, startDate, endDate])
 
   const maxLevelValue = useMemo(
     () => Math.max(...totalByLevel.map((entry) => entry.value), 1),
@@ -167,16 +185,17 @@ function App() {
       if (!response.ok) {
         const payload = await response.json().catch(() => null)
         const message = payload?.error || payload?.message || 'Erro ao importar o arquivo.'
-        const cleanMessage = message.includes('Formato de log inválido')
-          ? message.replace(/^.*?Formato de log inválido/, 'Formato de log inválido')
-          : message
-        throw new Error(cleanMessage)
+        throw new Error(message)
       }
+
+      const payload = (await response.json()) as { imported: number; ignored: number; durationMs: number }
 
       setSearch('')
       setSelectedLevel('ALL')
+      setStartDate('')
+      setEndDate('')
       event.target.value = ''
-      setSuccessMessage('Arquivo importado com sucesso!')
+      setSuccessMessage(`Arquivo importado com sucesso! ${payload.imported} registros importados, ${payload.ignored} ignorados em ${payload.durationMs}ms.`)
       await loadData()
     } catch (importError) {
       setError(importError instanceof Error ? importError.message : 'Não foi possível importar o arquivo.')
@@ -283,11 +302,28 @@ function App() {
           </div>
         </section>
 
+        <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Trend over time</h2>
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="period" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="#38bdf8" strokeWidth={3} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
           <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h2 className="text-lg font-semibold text-white">Registered logs</h2>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <select
                 value={selectedLevel}
                 onChange={(event) => setSelectedLevel(event.target.value)}
@@ -298,6 +334,20 @@ function App() {
                   <option key={level} value={level}>{level}</option>
                 ))}
               </select>
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none"
+              />
+
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none"
+              />
 
               <input
                 value={search}

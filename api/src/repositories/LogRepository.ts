@@ -7,6 +7,8 @@ export type LogFilters = {
   search?: string;
   page?: number;
   limit?: number;
+  startDate?: Date;
+  endDate?: Date;
 };
 
 export class LogRepository {
@@ -21,7 +23,7 @@ export class LogRepository {
   }
 
   async findAll(filters: LogFilters = {}) {
-    const { level, search, page = 1, limit = 20 } = filters;
+    const { level, search, page = 1, limit = 20, startDate, endDate } = filters;
     const query = this.repository
       .createQueryBuilder('log')
       .orderBy('log.timestamp', 'DESC');
@@ -32,6 +34,14 @@ export class LogRepository {
 
     if (search) {
       query.andWhere('log.message ILIKE :search', { search: `%${search}%` });
+    }
+
+    if (startDate) {
+      query.andWhere('log.timestamp >= :startDate', { startDate });
+    }
+
+    if (endDate) {
+      query.andWhere('log.timestamp <= :endDate', { endDate });
     }
 
     const total = await query.getCount();
@@ -72,5 +82,33 @@ export class LogRepository {
       byLevel,
       timeline,
     };
+  }
+
+  async getTrends() {
+    const total = await this.repository.count();
+    const groupBy = total <= 200
+      ? "DATE_TRUNC('hour', log.timestamp)"
+      : "DATE_TRUNC('day', log.timestamp)";
+
+    const rows = await this.repository
+      .createQueryBuilder('log')
+      .select(groupBy, 'period')
+      .addSelect('COUNT(log.id)', 'count')
+      .groupBy(groupBy)
+      .orderBy(groupBy, 'ASC')
+      .getRawMany();
+
+    return rows.map((row) => {
+      const rawPeriod = row.period as string | Date | undefined;
+      const parsed = rawPeriod ? new Date(rawPeriod) : null;
+      const period = parsed && !Number.isNaN(parsed.getTime())
+        ? parsed.toISOString().slice(0, total <= 200 ? 13 : 10)
+        : String(rawPeriod ?? '');
+
+      return {
+        period,
+        count: Number(row.count ?? 0),
+      };
+    });
   }
 }

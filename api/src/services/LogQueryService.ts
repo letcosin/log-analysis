@@ -10,4 +10,8 @@ export class LogQueryService {
   async stats() {
     return this.logRepository.getStats();
   }
+
+  async trends() {
+    return this.logRepository.getTrends();
+  }
 }

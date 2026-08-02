@@ -8,14 +8,51 @@ Full-stack project for importing, processing, and analyzing application logs.
 - Frontend: React, Vite, TypeScript, Tailwind CSS, Recharts
 - Infra: Docker, Docker Compose
 
+## Architecture decisions
+
+The solution keeps the existing layered structure intact: Express routes delegate to controllers, services handle import/query logic, repositories apply TypeORM filters and aggregations, and the frontend consumes the same API contract already in use. This preserves the current architecture while adding the minimum required extensions for date filtering, trend analysis and resilient imports.
+
 ## Features
 
 - Upload of log files in `.txt` and `.log` format
-- Validation of log line format before import
+- Validation of log line format during import without interrupting the full batch
 - Storage in PostgreSQL
-- Log listing with filters
+- Log listing with filters, search and date range filtering
 - Statistics by log level and time window
-- Dashboard for visual analysis
+- Dashboard with trend visualization and existing charts preserved
+
+## API examples
+
+### List logs with date range
+
+```http
+GET /api/logs?level=ERROR&search=database&startDate=2026-08-01&endDate=2026-08-31&page=1&limit=20
+```
+
+### Dashboard trends
+
+```http
+GET /api/dashboard/trends
+```
+
+Response example:
+
+```json
+[
+  { "period": "2026-08-01", "count": 53 },
+  { "period": "2026-08-02", "count": 71 }
+]
+```
+
+### Upload response
+
+```json
+{
+  "imported": 2500,
+  "ignored": 12,
+  "durationMs": 143
+}
+```
 
 ## Services
 
@@ -101,4 +138,5 @@ VITE_API_URL=http://localhost:3001/api
 
 - The project is intended to be run with Docker for the fastest setup.
 - Use the file import flow to add log batches to PostgreSQL.
-- Invalid log lines are rejected with a clear validation message.
+- Invalid log lines are skipped individually and counted in the ignored total instead of aborting the whole import.
+- The application returns structured HTTP errors for invalid files, invalid params and invalid dates.

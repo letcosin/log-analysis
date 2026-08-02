@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { HttpError } from '../utils/httpError';
 
 export function errorHandler(
   error: Error,
@@ -8,10 +9,20 @@ export function errorHandler(
 ) {
   console.error(error);
 
-  const isValidationError = error.message.includes('Formato de log inválido') || error.message.includes('Apenas arquivos .log e .txt são permitidos');
+  if (error instanceof HttpError) {
+    return res.status(error.statusCode).json({
+      message: error.message,
+      error: error.message,
+    });
+  }
 
-  return res.status(isValidationError ? 400 : 500).json({
-    message: isValidationError ? 'Arquivo de importação inválido' : 'Erro interno do servidor',
-    error: error.message,
+  const message = error.message || 'Erro interno do servidor';
+  const isBadRequest =
+    error.name === 'MulterError' ||
+    /arquivo.*inválido|invalid.*file|Only \.log and \.txt|datas? inválidas|Parâmetros inválidos|Data inválida|A data inicial deve ser anterior|No file uploaded/i.test(message);
+
+  return res.status(isBadRequest ? 400 : 500).json({
+    message: isBadRequest ? 'Requisição inválida' : 'Erro interno do servidor',
+    error: message,
   });
 }
